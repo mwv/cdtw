@@ -35,7 +35,7 @@ def dtw(np.ndarray[DTYPE_t, ndim=2] XA,
             d = 0.0
             for k in xrange(0, dim):
                 d += pow(XA[i, k] - XB[j, k], 2)
-                D[i, j] = sqrt(d)
+            D[i, j] = sqrt(d)
 
     H = np.empty([mA+1, mB+1], dtype=DTYPE)
     for i in xrange(1, mA+1):
