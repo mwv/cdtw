@@ -47,3 +47,8 @@ src/cdtw/*.html
 
 # uv
 .venv/
+
+# agent workflow scratch (plans, worktrees)
+docs/superpowers/
+.superpowers/
+.claude/worktrees/
