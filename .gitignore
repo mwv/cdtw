@@ -41,9 +41,11 @@ output/*/index.html
 # Sphinx
 docs/_build
 
-# Cython generated files
-src/cdtw/*.c
-src/cdtw/*.html
+# Rust build output
+target/
+
+# benchmark results are machine-specific
+bench/results/
 
 # uv
 .venv/
