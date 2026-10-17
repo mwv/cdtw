@@ -90,3 +90,10 @@ def test_dtw_empty_sequence_raises(shape_a, shape_b):
     XB = np.zeros(shape_b)
     with pytest.raises(ValueError):
         cdtw.dtw(XA, XB)
+
+
+def test_dtw_cosine_metric_all_zero_row_returns_nan_instead_of_raising():
+    XA = np.array([[0.0, 0.0, 0.0], [1.0, 2.0, 3.0]])
+    XB = np.array([[1.0, 1.0, 1.0], [2.0, 2.0, 2.0]])
+    result = cdtw.dtw(XA, XB, metric=1)
+    assert np.isnan(result)

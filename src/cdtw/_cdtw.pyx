@@ -7,6 +7,7 @@ cdef extern from "math.h":
     double pow(double x, double y)
     double sqrt(double x)
     double fabs(double x)
+    double NAN
 
 cdef extern from "float.h":
     double FLT_MAX
@@ -53,7 +54,10 @@ def dtw(const double[:, ::1] XA, const double[:, ::1] XB, int metric=0):
                     powB += pow(XB[j, k], 2)
                     enumerator += XA[i, k] * XB[j, k]
                 denominator = sqrt(powA) * sqrt(powB)
-                D[i, j] = 1 - enumerator / denominator
+                if denominator == 0:
+                    D[i, j] = NAN
+                else:
+                    D[i, j] = 1 - enumerator / denominator
 
     H = np.empty([mA+1, mB+1], dtype=np.double)
     for i in range(1, mA+1):
