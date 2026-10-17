@@ -62,7 +62,7 @@ Ready to contribute? Here's how to set up `cdtw` for local development.
 
     $ git clone git@github.com:your_name_here/cdtw.git
 
-3. Install your local copy using uv (requires a Rust toolchain, see
+3. Install your local copy using uv (requires Rust 1.85 or newer, see
    https://rustup.rs; ``uv sync`` builds the extension with maturin, and
    rebuilds it whenever Rust sources change)::
 
