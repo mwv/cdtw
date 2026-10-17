@@ -31,6 +31,20 @@ Homepage = "https://github.com/mwv/cdtw"
 [dependency-groups]
 dev = ["pytest"]
 
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.pyx" }]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "/src",
+    "/tests",
+    "/README.rst",
+    "/HISTORY.rst",
+    "/AUTHORS.rst",
+    "/CONTRIBUTING.rst",
+    "/LICENSE",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/cdtw"]
 

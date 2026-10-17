@@ -12,7 +12,7 @@ cdef extern from "float.h":
     double FLT_MAX
 
 @cython.boundscheck(False)
-def dtw(double[:, ::1] XA, double[:, ::1] XB, int metric=0):
+def dtw(const double[:, ::1] XA, const double[:, ::1] XB, int metric=0):
     """calculate dtw between two observation x features arrays.
 
     :param XA: ndarray of samples x features
@@ -33,6 +33,8 @@ def dtw(double[:, ::1] XA, double[:, ::1] XB, int metric=0):
         raise ValueError("XA and XB must have the same number of features")
     if metric not in (0, 1):
         raise ValueError(f"unknown metric: {metric}")
+    if mA == 0 or mB == 0:
+        raise ValueError("XA and XB must each have at least one sample")
 
     D = np.empty([mA, mB], dtype=np.double)
     for i in range(0, mA):
