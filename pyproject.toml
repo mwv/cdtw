@@ -1,11 +1,11 @@
 [build-system]
-requires = ["hatchling", "hatch-cython", "Cython>=3", "setuptools", "numpy"]
-build-backend = "hatchling.build"
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
 
 [project]
 name = "cdtw"
-version = "0.2.0"
-description = "Fast dtw in python/cython."
+version = "0.3.0"
+description = "Fast dynamic time warping for speech and other feature sequences."
 readme = "README.rst"
 license = "GPL-3.0-only"
 license-files = ["LICENSE"]
@@ -13,7 +13,7 @@ requires-python = ">=3.10"
 authors = [
     { name = "Maarten Versteegh", email = "maartenversteegh@gmail.com" },
 ]
-keywords = ["cdtw"]
+keywords = ["dtw", "dynamic time warping", "speech", "time series"]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
     "Intended Audience :: Developers",
@@ -23,7 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Cython",
+    "Programming Language :: Rust",
 ]
 dependencies = ["numpy"]
 
@@ -34,25 +34,21 @@ Homepage = "https://github.com/mwv/cdtw"
 dev = ["pytest"]
 
 [tool.uv]
-cache-keys = [{ file = "pyproject.toml" }, { file = "src/**/*.pyx" }]
-
-[tool.hatch.build.targets.sdist]
-include = [
-    "/src",
-    "/tests",
-    "/README.rst",
-    "/HISTORY.rst",
-    "/AUTHORS.rst",
-    "/CONTRIBUTING.rst",
-    "/LICENSE",
+cache-keys = [
+    { file = "pyproject.toml" },
+    { file = "Cargo.toml" },
+    { file = "core/Cargo.toml" },
+    { file = "**/*.rs" },
 ]
 
-[tool.hatch.build.targets.wheel]
-packages = ["src/cdtw"]
-
-[tool.hatch.build.targets.wheel.hooks.cython]
-
-[tool.hatch.build.targets.wheel.hooks.cython.options]
-src = "cdtw"
-compile_py = false
-directives = { boundscheck = false, language_level = 3 }
+[tool.maturin]
+python-source = "python"
+module-name = "cdtw._cdtw"
+include = [
+    { path = "tests/**/*.py", format = "sdist" },
+    { path = "bench/bench.py", format = "sdist" },
+    { path = "HISTORY.rst", format = "sdist" },
+    { path = "AUTHORS.rst", format = "sdist" },
+    { path = "CONTRIBUTING.rst", format = "sdist" },
+]
+exclude = [{ path = "bench/results/**", format = "sdist" }]

@@ -1,8 +1,13 @@
 import numpy as np
 
 
-def dtw_reference(XA: np.ndarray, XB: np.ndarray, metric: str = "euclidean") -> float:
-    """Pure NumPy reference DTW implementation, independent of the Cython extension."""
+def dtw_reference(
+    XA: np.ndarray, XB: np.ndarray, metric: str = "euclidean", window: int | None = None
+) -> float:
+    """Pure NumPy reference DTW implementation, independent of the compiled extension.
+
+    ``window`` is a Sakoe-Chiba radius, widened to the length difference.
+    """
     mA = XA.shape[0]
     mB = XB.shape[0]
 
@@ -17,13 +22,12 @@ def dtw_reference(XA: np.ndarray, XB: np.ndarray, metric: str = "euclidean") -> 
     else:
         raise ValueError(f"unknown metric: {metric}")
 
-    H = np.empty((mA + 1, mB + 1), dtype=np.float64)
-    H[1:, 0] = np.finfo(np.float32).max
-    H[0, 1:] = np.finfo(np.float32).max
+    r = max(mA, mB) if window is None else max(window, abs(mA - mB))
+    H = np.full((mA + 1, mB + 1), np.inf)
     H[0, 0] = 0.0
 
     for i in range(1, mA + 1):
-        for j in range(1, mB + 1):
+        for j in range(max(1, i - r), min(mB, i + r) + 1):
             H[i, j] = min(H[i - 1, j], H[i, j - 1], H[i - 1, j - 1]) + D[i - 1, j - 1]
 
     return float(H[mA, mB])

@@ -1,0 +1,11 @@
+[package]
+name = "cdtw-core"
+version = "0.3.0"
+edition = "2021"
+rust-version = "1.83"
+description = "Fast dynamic time warping for multi-dimensional feature sequences"
+license = "GPL-3.0-only"
+publish = false
+
+[dependencies]
+rayon = "1.10"

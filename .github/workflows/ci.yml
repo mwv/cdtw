@@ -6,16 +6,41 @@ on:
   pull_request:
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  rust:
+    # ubuntu: x86-64 AVX2 and SSE2 paths; macos: aarch64 NEON path
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - run: cargo clippy -p cdtw-core --all-targets -- -D warnings
+      - run: cargo test -p cdtw-core
+      - run: cargo test -p cdtw-core --release
+      - if: runner.os == 'Linux'
+        run: cargo test -p cdtw-core --release
+        env:
+          CDTW_DISABLE_AVX2: "1"
+
+  python:
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+        include:
+          - os: macos-latest
+            python-version: "3.13"
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
       - uses: astral-sh/setup-uv@v5
         with:
           python-version: ${{ matrix.python-version }}
       - run: uv sync --locked
       - run: uv run pytest tests/ -v
+      - run: uv run python bench/bench.py run --suite quick --min-time 0.01 --repeats 1
       - run: uv build
