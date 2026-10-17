@@ -40,5 +40,10 @@ output/*/index.html
 
 # Sphinx
 docs/_build
-/src/cdtw.c
-/src/cdtw.html
+
+# Cython generated files
+src/cdtw/*.c
+src/cdtw/*.html
+
+# uv
+.venv/

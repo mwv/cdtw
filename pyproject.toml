@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling", "hatch-cython", "Cython", "setuptools", "numpy"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cdtw"
+version = "0.2.0"
+description = "Fast dtw in python/cython."
+readme = "README.rst"
+license = "GPL-3.0-only"
+requires-python = ">=3.10"
+authors = [
+    { name = "Maarten Versteegh", email = "maartenversteegh@gmail.com" },
+]
+keywords = ["cdtw"]
+classifiers = [
+    "Development Status :: 2 - Pre-Alpha",
+    "Intended Audience :: Developers",
+    "Natural Language :: English",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+]
+dependencies = ["numpy"]
+
+[project.urls]
+Homepage = "https://github.com/mwv/cdtw"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/cdtw"]
+
+[tool.hatch.build.targets.wheel.hooks.cython]
+dependencies = ["hatch-cython"]
+
+[tool.hatch.build.targets.wheel.hooks.cython.options]
+src = "cdtw"
+compile_py = false
+include_numpy = true
+directives = { boundscheck = false, language_level = 3 }
