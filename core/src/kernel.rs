@@ -191,11 +191,18 @@ pub fn fill_tile<T: Float, V: Simd<T>, const NV: usize, const COS: bool>(
 
 /// Minimum of two non-NaN values (NaN inputs are rejected up front or give
 /// unspecified results): a single `fminnm` on aarch64 and `minsd` on x86.
+///
+/// On aarch64 this uses the NEON intrinsic rather than `f64::min`: newer
+/// LLVM lowers `f64::min` with extra NaN-canonicalising `fminnm x, x`
+/// instructions and vectorises it across DP rows, both of which lengthen
+/// the DP's dependency chains.
 #[inline(always)]
 fn min(a: f64, b: f64) -> f64 {
     #[cfg(target_arch = "aarch64")]
     {
-        a.min(b)
+        use std::arch::aarch64::{vdup_n_f64, vget_lane_f64, vminnm_f64};
+        // SAFETY: NEON is part of the aarch64 baseline.
+        unsafe { vget_lane_f64::<0>(vminnm_f64(vdup_n_f64(a), vdup_n_f64(b))) }
     }
     #[cfg(not(target_arch = "aarch64"))]
     {

@@ -25,6 +25,15 @@ jobs:
         env:
           CDTW_DISABLE_AVX2: "1"
 
+  msrv:
+    # keep in sync with rust-version in Cargo.toml and core/Cargo.toml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.85
+      - run: cargo test -p cdtw-core --locked
+      - run: cargo check -p cdtw-py --locked
+
   python:
     strategy:
       matrix:
