@@ -11,13 +11,14 @@
 mod float;
 mod kernel;
 mod simd;
+mod wavefront;
 
 use std::fmt;
 
 use rayon::prelude::*;
 
 pub use float::Float;
-use kernel::{dtw_pair, prepare_cols, prepare_rows, Scratch};
+use kernel::{dtw_pair, dtw_pair_full, prepare_cols, prepare_rows, Scratch};
 
 /// Frame-level distance.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -108,8 +109,7 @@ fn validate<T>(groups: &[(&str, &[Seq<'_, T>])]) -> Result<(), Error> {
     Ok(())
 }
 
-/// DTW cost between two sequences.
-pub fn dtw<T: Float>(a: Seq<'_, T>, b: Seq<'_, T>, opts: &Options) -> Result<f64, Error> {
+fn check_pair<T>(a: &Seq<'_, T>, b: &Seq<'_, T>) -> Result<(), Error> {
     if a.len == 0 || b.len == 0 {
         return Err(Error("sequences must have at least one frame".into()));
     }
@@ -119,9 +119,37 @@ pub fn dtw<T: Float>(a: Seq<'_, T>, b: Seq<'_, T>, opts: &Options) -> Result<f64
             a.dim, b.dim
         )));
     }
+    Ok(())
+}
+
+/// A warping path: `(i, j)` frame pairs from `(0, 0)` to `(n - 1, m - 1)`.
+pub type Path = Vec<(usize, usize)>;
+
+fn single<T: Float>(a: Seq<'_, T>, b: Seq<'_, T>, opts: &Options, path: bool, n_jobs: Option<usize>) -> Result<(f64, Option<Path>), Error> {
+    check_pair(&a, &b)?;
     let rows = prepare_rows(&a, opts.metric);
     let cols = prepare_cols(&b, opts.metric);
-    Ok(dtw_pair(&rows, &cols, opts.metric, opts.window, &mut Scratch::new()))
+    with_threads(n_jobs, |parallel| dtw_pair_full(&rows, &cols, opts.metric, opts.window, path, parallel))
+}
+
+/// DTW cost between two sequences.
+///
+/// `n_jobs` sets the threads used for this one pair, with the same
+/// convention as [`cdist`]. Pairs with fewer than 2^18 (about 260,000) band
+/// cells always run on the calling thread.
+pub fn dtw<T: Float>(a: Seq<'_, T>, b: Seq<'_, T>, opts: &Options, n_jobs: Option<usize>) -> Result<f64, Error> {
+    Ok(single(a, b, opts, false, n_jobs)?.0)
+}
+
+/// DTW cost and an optimal warping path: the `(i, j)` frame pairs it visits,
+/// from `(0, 0)` to `(a.len() - 1, b.len() - 1)`. Among equally cheap
+/// predecessors the diagonal step is preferred, then the step along `a`.
+///
+/// Needs one byte of memory per band cell. The path is empty when the cost
+/// is NaN. `n_jobs` as for [`dtw`].
+pub fn dtw_path<T: Float>(a: Seq<'_, T>, b: Seq<'_, T>, opts: &Options, n_jobs: Option<usize>) -> Result<(f64, Path), Error> {
+    let (cost, path) = single(a, b, opts, true, n_jobs)?;
+    Ok((cost, path.unwrap_or_default()))
 }
 
 /// Run `f` on `n_jobs` threads: `None` uses rayon's global pool (all cores

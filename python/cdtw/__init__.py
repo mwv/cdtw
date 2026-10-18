@@ -19,6 +19,7 @@ from __future__ import annotations
 import operator
 from collections.abc import Iterable
 from importlib.metadata import version
+from typing import Literal, overload
 
 import numpy as np
 from numpy.typing import ArrayLike
@@ -74,17 +75,57 @@ def _coerce(arrays: list[np.ndarray]) -> tuple[list[np.ndarray], bool]:
     return [np.ascontiguousarray(a, dtype=dtype) for a in arrays], f32
 
 
-def dtw(a: ArrayLike, b: ArrayLike, metric: str = "euclidean", window: int | None = None) -> float:
+@overload
+def dtw(
+    a: ArrayLike,
+    b: ArrayLike,
+    metric: str = ...,
+    window: int | None = ...,
+    *,
+    return_path: Literal[False] = ...,
+    n_jobs: int | None = ...,
+) -> float: ...
+@overload
+def dtw(
+    a: ArrayLike,
+    b: ArrayLike,
+    metric: str = ...,
+    window: int | None = ...,
+    *,
+    return_path: Literal[True],
+    n_jobs: int | None = ...,
+) -> tuple[float, np.ndarray]: ...
+def dtw(
+    a: ArrayLike,
+    b: ArrayLike,
+    metric: str = "euclidean",
+    window: int | None = None,
+    *,
+    return_path: bool = False,
+    n_jobs: int | None = 1,
+) -> float | tuple[float, np.ndarray]:
     """DTW cost between two sequences.
 
     :param a: frames x features array (or 1-D array)
     :param b: frames x features array (or 1-D array)
     :param metric: frame distance, ``"euclidean"`` or ``"cosine"``
     :param window: Sakoe-Chiba band radius in frames; ``None`` for no constraint
+    :param return_path: also return an optimal warping path
+    :param n_jobs: threads for this one pair; ``None`` or ``-1`` uses all
+        cores. Only pairs of more than about 260,000 band cells (roughly
+        500 x 500 frames) are split; smaller pairs always run on one thread.
+        For many pairs, use :func:`cdist` or :func:`pdist` instead.
+    :returns: the cost, or ``(cost, path)`` if ``return_path``. ``path`` is an
+        ``(L, 2)`` integer array of the ``(i, j)`` frame pairs on the path,
+        from ``(0, 0)`` to ``(len(a) - 1, len(b) - 1)``; among equally cheap
+        paths, diagonal steps are preferred. It is empty when the cost is
+        ``nan``. Computing the path needs one byte per band cell.
     """
     (a, b), f32 = _coerce([_as_array(a), _as_array(b)])
-    fn = _cdtw.dtw_f32 if f32 else _cdtw.dtw_f64
-    return fn(a, b, _metric(metric), _window(window))
+    args = (a, b, _metric(metric), _window(window), _n_jobs(n_jobs))
+    if return_path:
+        return (_cdtw.dtw_path_f32 if f32 else _cdtw.dtw_path_f64)(*args)
+    return (_cdtw.dtw_f32 if f32 else _cdtw.dtw_f64)(*args)
 
 
 def cdist(
