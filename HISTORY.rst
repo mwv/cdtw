@@ -6,6 +6,10 @@ History
 0.3.0 (unreleased)
 ++++++++++++++++++
 
+* ``dtw(..., return_path=True)`` returns the optimal warping path.
+* ``dtw(..., n_jobs=...)`` splits a single large pair across threads
+  (about 5x on 8 cores for 4000 x 4400 frames); results are bit-identical.
+
 * Rewritten in Rust (PyO3/maturin), replacing the Cython extension: fused
   distance/DP kernel with explicit SIMD and O(len) memory; roughly 5-20x
   faster single-threaded than 0.2.0.

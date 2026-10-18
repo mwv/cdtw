@@ -31,6 +31,12 @@ Usage::
     cdtw.dtw(XA, XB, metric="cosine")      # cosine frame distance
     cdtw.dtw(XA, XB, window=3)             # Sakoe-Chiba band
 
+    # the optimal warping path: (L, 2) array of (i, j) frame pairs
+    cost, path = cdtw.dtw(XA, XB, return_path=True)
+
+    # one long pair on all cores (pairs under ~500 x 500 frames stay single-threaded)
+    cdtw.dtw(np.random.rand(5000, 39), np.random.rand(5200, 39), n_jobs=-1)
+
     # many pairs at once, on all cores (n_jobs=1 for a single thread)
     segments = [np.random.rand(n, 39) for n in (20, 35, 50, 80)]
     D = cdtw.cdist(segments, segments, metric="cosine")  # 4 x 4 matrix
@@ -47,7 +53,11 @@ Semantics
   always in ``float64``.
 * 1-D arrays are treated as one feature per frame.
 * With ``metric="cosine"``, a sequence containing an all-zero frame has
-  distance ``nan`` to everything.
+  distance ``nan`` to everything (and an empty path).
+* Among equally cheap warping paths, ``return_path`` prefers diagonal steps.
+  It needs one byte of memory per cell inside the band, e.g. 1 MB for
+  1000 x 1000 frames without a window.
+* Single pairs and paths are bit-identical whatever ``n_jobs`` is.
 * ``metric=0`` / ``metric=1`` are accepted for compatibility with cdtw < 0.3.
 
 Benchmarks

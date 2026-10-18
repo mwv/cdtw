@@ -35,9 +35,24 @@ fn dtw_impl<T: Float + Element>(
     b: PyReadonlyArray2<'_, T>,
     metric: u8,
     window: Option<usize>,
+    n_jobs: Option<usize>,
 ) -> PyResult<f64> {
     let (a, b, opts) = (seq(&a)?, seq(&b)?, options(metric, window)?);
-    py.detach(|| cdtw_core::dtw(a, b, &opts)).map_err(value_error)
+    py.detach(|| cdtw_core::dtw(a, b, &opts, n_jobs)).map_err(value_error)
+}
+
+fn dtw_path_impl<'py, T: Float + Element>(
+    py: Python<'py>,
+    a: PyReadonlyArray2<'py, T>,
+    b: PyReadonlyArray2<'py, T>,
+    metric: u8,
+    window: Option<usize>,
+    n_jobs: Option<usize>,
+) -> PyResult<(f64, Bound<'py, PyArray2<isize>>)> {
+    let (a, b, opts) = (seq(&a)?, seq(&b)?, options(metric, window)?);
+    let (cost, path) = py.detach(|| cdtw_core::dtw_path(a, b, &opts, n_jobs)).map_err(value_error)?;
+    let flat: Vec<isize> = path.iter().flat_map(|&(i, j)| [i as isize, j as isize]).collect();
+    Ok((cost, PyArray1::from_vec(py, flat).reshape([path.len(), 2])?))
 }
 
 fn cdist_impl<'py, T: Float + Element>(
@@ -66,10 +81,29 @@ fn pdist_impl<'py, T: Float + Element>(
 }
 
 macro_rules! typed {
-    ($t:ty, $dtw:ident, $cdist:ident, $pdist:ident) => {
+    ($t:ty, $dtw:ident, $dtw_path:ident, $cdist:ident, $pdist:ident) => {
         #[pyfunction]
-        fn $dtw(py: Python<'_>, a: PyReadonlyArray2<'_, $t>, b: PyReadonlyArray2<'_, $t>, metric: u8, window: Option<usize>) -> PyResult<f64> {
-            dtw_impl(py, a, b, metric, window)
+        fn $dtw(
+            py: Python<'_>,
+            a: PyReadonlyArray2<'_, $t>,
+            b: PyReadonlyArray2<'_, $t>,
+            metric: u8,
+            window: Option<usize>,
+            n_jobs: Option<usize>,
+        ) -> PyResult<f64> {
+            dtw_impl(py, a, b, metric, window, n_jobs)
+        }
+
+        #[pyfunction]
+        fn $dtw_path<'py>(
+            py: Python<'py>,
+            a: PyReadonlyArray2<'py, $t>,
+            b: PyReadonlyArray2<'py, $t>,
+            metric: u8,
+            window: Option<usize>,
+            n_jobs: Option<usize>,
+        ) -> PyResult<(f64, Bound<'py, PyArray2<isize>>)> {
+            dtw_path_impl(py, a, b, metric, window, n_jobs)
         }
 
         #[pyfunction]
@@ -97,13 +131,15 @@ macro_rules! typed {
     };
 }
 
-typed!(f64, dtw_f64, cdist_f64, pdist_f64);
-typed!(f32, dtw_f32, cdist_f32, pdist_f32);
+typed!(f64, dtw_f64, dtw_path_f64, cdist_f64, pdist_f64);
+typed!(f32, dtw_f32, dtw_path_f32, cdist_f32, pdist_f32);
 
 #[pymodule]
 fn _cdtw(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(dtw_f64, m)?)?;
     m.add_function(wrap_pyfunction!(dtw_f32, m)?)?;
+    m.add_function(wrap_pyfunction!(dtw_path_f64, m)?)?;
+    m.add_function(wrap_pyfunction!(dtw_path_f32, m)?)?;
     m.add_function(wrap_pyfunction!(cdist_f64, m)?)?;
     m.add_function(wrap_pyfunction!(cdist_f32, m)?)?;
     m.add_function(wrap_pyfunction!(pdist_f64, m)?)?;

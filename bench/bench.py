@@ -50,7 +50,10 @@ class Scenario:
     dim: int
     dtype: str = "float64"
     window: int | None = None
+    # cdist/pdist: None = all cores; dtw: None = the default (one thread), -1 = all cores
     n_jobs: int | None = None
+    # dtw: also compute the warping path
+    path: bool = False
     # dtw: lengths of the two sequences
     len_a: int = 0
     len_b: int = 0
@@ -73,6 +76,8 @@ class Scenario:
             parts.append(f"w{self.window}")
         if self.n_jobs is not None:
             parts.append(f"j{self.n_jobs}")
+        if self.path:
+            parts.append("path")
         return "/".join(parts)
 
 
@@ -83,6 +88,10 @@ def _suite_quick() -> list[Scenario]:
             s.append(Scenario("dtw", metric, dim, len_a=n, len_b=n + n // 10))
     s.append(Scenario("dtw", "euclidean", 39, len_a=1000, len_b=1100, dtype="float32"))
     s.append(Scenario("dtw", "euclidean", 39, len_a=1000, len_b=1100, window=50))
+    s.append(Scenario("dtw", "euclidean", 39, len_a=1000, len_b=1100, path=True))
+    # one long pair, split across cores
+    s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400))
+    s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400, n_jobs=-1))
     # word-sized speech segments, as in ABX / query-by-example evaluation
     for n_jobs in (1, None):
         s.append(Scenario("cdist", "cosine", 39, n_a=100, n_b=100, min_len=20, max_len=80, n_jobs=n_jobs))
@@ -101,6 +110,14 @@ def _suite_full() -> list[Scenario]:
                     s.append(Scenario("dtw", metric, dim, dtype=dtype, len_a=n, len_b=n + n // 10))
     for window in (10, 50, 200):
         s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400, window=window))
+    for n_jobs in (2, 4, -1):
+        s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400, n_jobs=n_jobs))
+        s.append(Scenario("dtw", "cosine", 39, dtype="float32", len_a=4000, len_b=4400, n_jobs=n_jobs))
+        s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400, window=200, n_jobs=n_jobs))
+    s.append(Scenario("dtw", "euclidean", 39, len_a=1000, len_b=1100, n_jobs=-1))
+    for n, dim in [(200, 39), (1000, 39), (4000, 39), (1000, 768)]:
+        s.append(Scenario("dtw", "euclidean", dim, len_a=n, len_b=n + n // 10, path=True))
+    s.append(Scenario("dtw", "euclidean", 39, len_a=4000, len_b=4400, path=True, n_jobs=-1))
     for n_jobs in (1, 2, 4, None):
         s.append(Scenario("cdist", "cosine", 39, n_a=200, n_b=200, min_len=20, max_len=80, n_jobs=n_jobs))
     for dim in (13, 80, 768):
@@ -182,6 +199,14 @@ def _cdtw_adapter(sc: Scenario, inputs) -> Callable[[], object]:
 
     if sc.kind == "dtw":
         a, b = inputs
+        if sc.n_jobs is not None:
+            if "n_jobs" not in params:
+                raise Skip("no single-pair n_jobs")
+            kw["n_jobs"] = sc.n_jobs
+        if sc.path:
+            if "return_path" not in params:
+                raise Skip("no return_path")
+            kw["return_path"] = True
         return lambda: cdtw.dtw(a, b, metric=metric, **kw)
 
     if hasattr(cdtw, sc.kind):
@@ -317,6 +342,9 @@ def cmd_run(args) -> None:
     print(f"# {meta['cpu']} ({meta['cpu_count']} cpus), python {meta['python']}, "
           f"commit {meta['git_commit']}{' (dirty)' if meta['git_dirty'] else ''}")
     results = []
+    if not scenarios:
+        print("no scenarios match the filters (repeated --filter values must all match)")
+        return
     width = max(len(sc.id) for sc in scenarios)
     for sc in scenarios:
         inputs = _make_inputs(sc)

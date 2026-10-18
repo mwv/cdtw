@@ -1,13 +1,17 @@
 //! Tight loop over one DTW pair, for profilers (`samply record`, Instruments)
 //! and assembly inspection without Python in the way.
 //!
-//!     cargo run --release -p cdtw-core --example profile -- [len] [dim] [euclidean|cosine] [f32|f64] [window]
+//!     cargo run --release -p cdtw-core --example profile -- \
+//!         [len] [dim] [euclidean|cosine] [f32|f64] [window|none] [threads] [path]
+//!
+//! `threads` is 1 by default; 0 means all cores. A 7th argument `path` also
+//! computes the warping path.
 
 use std::time::Instant;
 
-use cdtw_core::{dtw, Float, Metric, Options, Seq};
+use cdtw_core::{dtw, dtw_path, Float, Metric, Options, Seq};
 
-fn run<T: Float>(data: Vec<T>, n: usize, m: usize, dim: usize, opts: Options) {
+fn run<T: Float>(data: Vec<T>, n: usize, m: usize, dim: usize, opts: Options, n_jobs: Option<usize>, path: bool) {
     let (a, b) = data.split_at(n * dim);
     let (a, b) = (Seq::new(a, n, dim).unwrap(), Seq::new(b, m, dim).unwrap());
     let cells = (n * m) as f64;
@@ -15,13 +19,19 @@ fn run<T: Float>(data: Vec<T>, n: usize, m: usize, dim: usize, opts: Options) {
     let t0 = Instant::now();
     let mut acc = 0.0;
     for _ in 0..iters {
-        acc += dtw(a, b, &opts).unwrap();
+        acc += if path {
+            let (cost, p) = dtw_path(a, b, &opts, n_jobs).unwrap();
+            cost + p.len() as f64
+        } else {
+            dtw(a, b, &opts, n_jobs).unwrap()
+        };
     }
     let per = t0.elapsed().as_secs_f64() / iters as f64;
     println!(
-        "{n}x{m} d{dim} {:?} {}: {:.3} ms/pair, {:.1} Mcells/s (checksum {acc:.6})",
+        "{n}x{m} d{dim} {:?} {} threads={} path={path}: {:.3} ms/pair, {:.1} Mcells/s (checksum {acc:.6})",
         opts.metric,
         std::any::type_name::<T>(),
+        n_jobs.map_or("all".to_string(), |j| j.to_string()),
         per * 1e3,
         cells / per / 1e6
     );
@@ -36,7 +46,12 @@ fn main() {
         "cosine" => Metric::Cosine,
         _ => Metric::Euclidean,
     };
-    let window = args.get(5).map(|w| w.parse().unwrap());
+    let window = arg(5, "none").parse().ok();
+    let n_jobs = match arg(6, "1").parse().unwrap() {
+        0 => None,
+        j => Some(j),
+    };
+    let path = arg(7, "") == "path";
     let m = n + n / 10;
     let mut state = 0x2545F4914F6CDD1Du64;
     let data: Vec<f64> = (0..(n + m) * dim)
@@ -49,8 +64,8 @@ fn main() {
         .collect();
     let opts = Options { metric, window };
     if arg(4, "f64") == "f32" {
-        run(data.iter().map(|&x| x as f32).collect(), n, m, dim, opts)
+        run(data.iter().map(|&x| x as f32).collect(), n, m, dim, opts, n_jobs, path)
     } else {
-        run(data, n, m, dim, opts)
+        run(data, n, m, dim, opts, n_jobs, path)
     }
 }
